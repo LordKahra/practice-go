@@ -1,4 +1,4 @@
-package larp
+package model
 
 // A LARP.
 type Game struct {
