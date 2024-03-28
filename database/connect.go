@@ -10,10 +10,10 @@ import (
 func ConnectToDatabase() (*sql.DB, error) {
 	user := "root"
 	//password := "insecure"
-	password := ""
+	password := "insecure"
 	host := "localhost"
 	port := "3306"
-	database := "southern_larp"
+	database := "hav"
 
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?parseTime=true", user, password, host, port, database)

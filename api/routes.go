@@ -8,6 +8,7 @@ import (
 	"io"
 	"practice-go/database"
 	"practice-go/model"
+	"strconv"
 )
 
 func GenerateRoutes(db *sql.DB) *gin.Engine {
@@ -16,7 +17,85 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	// Create all routes.
 
-	// ROUTES - GET
+	////////////////////////////////////////////////////////////////
+	//// ROUTES - GET //////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////
+
+	// HACKING ////////////////////////////////
+
+	routes.GET("/hack/character/:id/credentials", func(context *gin.Context) {
+		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		data, err := database.GetHackCharacterCredentials(db, charID)
+
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Credentials found.",
+			"data":    data,
+		})
+		return
+	})
+
+	routes.GET("/hack/character/:id/servers", func(context *gin.Context) {
+		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		servers, err := database.GetHackCharacterServers(db, charID)
+
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Servers found.",
+			"data":    servers,
+		})
+		return
+	})
+
+	routes.GET("/hack/servers", func(context *gin.Context) {
+		data, err := database.GetHackServers(db, "")
+
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Servers found.",
+			"data":    data,
+		})
+		return
+	})
+
+	//// NOT HACKING ////////////////////////////////
 
 	routes.GET("/events", func(context *gin.Context) {
 		//fmt.Println("Fetching events...")
@@ -34,7 +113,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 		context.JSON(200, gin.H{
 			"message": "List of events",
-			"events":  events,
+			"data":    events,
 		})
 		return
 		//context.JSON(200, gin.H{"message": "List of events"})
@@ -83,6 +162,125 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 	})
 
 	// ROUTES - POST
+
+	//// HACKING ////////////////////////////////////
+
+	routes.POST("/hack/command/connect", func(context *gin.Context) {
+		// Gather variables.
+		var credential model.HackCredential
+		if err := context.ShouldBindJSON(&credential); err != nil {
+			context.JSON(400, gin.H{"error": "Invalid JSON format"})
+			return
+		}
+
+		server, err := database.HackConnectToServer(db, credential)
+		if err != nil {
+			context.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		// server found.
+		context.JSON(200, gin.H{
+			"message": "Server connection successful.",
+			"data":    server,
+		})
+		return
+
+	})
+
+	routes.POST("/hack/command/upload", func(context *gin.Context) {
+		// Gather variables.
+		var jsonFields map[string]interface{}
+
+		// Read the JSON body
+		body, err := io.ReadAll(context.Request.Body)
+		if err != nil {
+			context.JSON(400, gin.H{"error": "Failed to read JSON body"})
+			return
+		}
+
+		// Decode JSON into map
+		if err := json.Unmarshal(body, &jsonFields); err != nil {
+			context.JSON(400, gin.H{"error": "Invalid JSON"})
+			return
+		}
+
+		// Variables retrieved.
+
+		fileId := int64(jsonFields["file_id"].(float64))
+		serverId := int64(jsonFields["server_id"].(float64))
+
+		// Get the file.
+		file, err := database.GetHackCharacterFile(db, fileId)
+
+		if err != nil {
+			context.JSON(500, gin.H{"error": "File not found."})
+			return
+		}
+
+		// Attempt the upload.
+		result, err := database.CreateHackUpload(db, serverId, file)
+
+		if err != nil {
+			context.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Upload successful.
+		context.JSON(201, gin.H{
+			"message": "File upload successful.",
+			"data":    result,
+		})
+		return
+	})
+
+	routes.POST("/hack/command/download", func(context *gin.Context) {
+		// Gather variables.
+		var jsonFields map[string]interface{}
+
+		// Read the JSON body
+		body, err := io.ReadAll(context.Request.Body)
+		if err != nil {
+			context.JSON(400, gin.H{"error": "Failed to read JSON body"})
+			return
+		}
+
+		// Decode JSON into map
+		if err := json.Unmarshal(body, &jsonFields); err != nil {
+			context.JSON(400, gin.H{"error": "Invalid JSON"})
+			return
+		}
+
+		// Variables retrieved.
+
+		fileId := int64(jsonFields["file_id"].(float64))
+		serverId := int64(jsonFields["server_id"].(float64))
+
+		// Get the file.
+		file, err := database.GetHackServerFile(db, fileId)
+
+		if err != nil {
+			context.JSON(500, gin.H{"error": "File not found."})
+			return
+		}
+
+		// Attempt the upload.
+		result, err := database.CreateHackDownload(db, serverId, file)
+
+		if err != nil {
+			context.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Upload successful.
+		context.JSON(201, gin.H{
+			"message": "File download successful.",
+			"data":    result,
+		})
+		return
+	})
+
+	//// NOT HACKING ////////////////////////////////
 
 	routes.POST("/events", func(context *gin.Context) {
 		var newEvent model.Event
