@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"io"
 	"practice-go/database"
-	"practice-go/model"
+	model2 "practice-go/model"
 	"strconv"
 )
 
@@ -167,7 +167,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	routes.POST("/hack/command/connect", func(context *gin.Context) {
 		// Gather variables.
-		var credential model.HackCredential
+		var credential model2.HackCredential
 		if err := context.ShouldBindJSON(&credential); err != nil {
 			context.JSON(400, gin.H{"error": "Invalid JSON format"})
 			return
@@ -283,7 +283,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 	//// NOT HACKING ////////////////////////////////
 
 	routes.POST("/events", func(context *gin.Context) {
-		var newEvent model.Event
+		var newEvent model2.Event
 
 		// Gather variables.
 		var jsonFields map[string]interface{}
