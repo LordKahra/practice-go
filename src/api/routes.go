@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"io"
 	"practice-go/database"
-	model2 "practice-go/model"
+	"practice-go/model"
 	"strconv"
 )
 
@@ -167,7 +167,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	routes.POST("/hack/command/connect", func(context *gin.Context) {
 		// Gather variables.
-		var credential model2.HackCredential
+		var credential model.HackCredential
 		if err := context.ShouldBindJSON(&credential); err != nil {
 			context.JSON(400, gin.H{"error": "Invalid JSON format"})
 			return
@@ -188,53 +188,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	})
 
-	routes.POST("/hack/command/upload", func(context *gin.Context) {
-		// Gather variables.
-		var jsonFields map[string]interface{}
-
-		// Read the JSON body
-		body, err := io.ReadAll(context.Request.Body)
-		if err != nil {
-			context.JSON(400, gin.H{"error": "Failed to read JSON body"})
-			return
-		}
-
-		// Decode JSON into map
-		if err := json.Unmarshal(body, &jsonFields); err != nil {
-			context.JSON(400, gin.H{"error": "Invalid JSON"})
-			return
-		}
-
-		// Variables retrieved.
-
-		fileId := int64(jsonFields["file_id"].(float64))
-		serverId := int64(jsonFields["server_id"].(float64))
-
-		// Get the file.
-		file, err := database.GetHackCharacterFile(db, fileId)
-
-		if err != nil {
-			context.JSON(500, gin.H{"error": "File not found."})
-			return
-		}
-
-		// Attempt the upload.
-		result, err := database.CreateHackUpload(db, serverId, file)
-
-		if err != nil {
-			context.JSON(500, gin.H{"error": err.Error()})
-			return
-		}
-
-		// Upload successful.
-		context.JSON(201, gin.H{
-			"message": "File upload successful.",
-			"data":    result,
-		})
-		return
-	})
-
-	routes.POST("/hack/command/download", func(context *gin.Context) {
+	routes.POST("/hack/command/transfer", func(context *gin.Context) {
 		// Gather variables.
 		var jsonFields map[string]interface{}
 
@@ -265,16 +219,16 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		}
 
 		// Attempt the upload.
-		result, err := database.CreateHackDownload(db, serverId, file)
+		result, err := database.HackTransferFile(db, serverId, file)
 
 		if err != nil {
 			context.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Upload successful.
+		// Transfer successful.
 		context.JSON(201, gin.H{
-			"message": "File download successful.",
+			"message": "File transfer successful.",
 			"data":    result,
 		})
 		return
@@ -283,7 +237,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 	//// NOT HACKING ////////////////////////////////
 
 	routes.POST("/events", func(context *gin.Context) {
-		var newEvent model2.Event
+		var newEvent model.Event
 
 		// Gather variables.
 		var jsonFields map[string]interface{}

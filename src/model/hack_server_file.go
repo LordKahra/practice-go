@@ -6,4 +6,5 @@ type HackServerFile struct {
 	Filename  string `json:"filename"`
 	Extension string `json:"extension"`
 	Data      string `json:"data"`
+	IntelID   int64  `json:"intel_id"`
 }

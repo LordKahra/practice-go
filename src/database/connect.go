@@ -16,7 +16,7 @@ func ConnectToDatabase() (*sql.DB, error) {
 	database := "hav"
 
 	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true", user, password, host, port, database)
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&collation=utf8mb4_0900_ai_ci", user, password, host, port, database)
 
 	db, err := sql.Open("mysql", dsn)
 

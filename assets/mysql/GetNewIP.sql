@@ -34,3 +34,25 @@ BEGIN
 
     RETURN generated_ip;
 END //
+
+DELIMITER //
+
+CREATE FUNCTION hav.getNewCharacterIPv4 ()
+    RETURNS VARCHAR(16) DETERMINISTIC
+BEGIN
+    DECLARE section1 INT;
+    SET section1 = (SELECT rule.argument FROM hav.hack_z_ip_rules rule WHERE rule.tag = 'character');
+
+    RETURN hav.getNewIPv4(section1, 0,0,0);
+END //
+
+DELIMITER //
+
+CREATE FUNCTION hav.getNewTaggedIPv4 (ip_tag varchar(255))
+    RETURNS VARCHAR(16) DETERMINISTIC
+BEGIN
+    DECLARE section1 INT;
+    SET section1 = (SELECT rule.argument FROM hav.hack_z_ip_rules rule WHERE rule.tag = ip_tag);
+
+    RETURN hav.getNewIPv4(section1, 0,0,0);
+END //

@@ -16,44 +16,11 @@ import (
 
 //// HACKING ///////////////////
 
-func GetHackCharacterFile(db *sql.DB, fileId int64) (HackCharacterFile, error) {
-	var file HackCharacterFile
-
-	query :=
-		`SELECT id, character_id, filename, extension, data FROM hack_character_files
-			WHERE id = ?`
-
-	rows, err := db.Query(query, fileId)
-
-	if err != nil {
-		return file, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		// Prep potentially null objects.
-		// None, continue.
-
-		// Scan the row into the HackServer.
-
-		err = rows.Scan(&file.ID, &file.CharacterID, &file.Filename, &file.Extension, &file.Data)
-		if err != nil {
-			return file, err
-		}
-
-		// Done. Return.
-		return file, nil
-	}
-	// File not found.
-	return file, errors.New("file not found")
-}
-
 func GetHackCharacterCredentials(db *sql.DB, characterId int64) ([]HackCredential, error) {
-	query :=
-		`SELECT credential.id, credential.username, credential.password, credential.server_id 
-			FROM hack_credentials credential 
-			LEFT JOIN hav.hack_r_character_credentials char_creds on credential.id = char_creds.credential_id 
-			WHERE char_creds.character_id = ?`
+	query := `SELECT cred.id as id, cred.username as username, cred.password as password, cred.server_id as server_id
+				FROM hack_character_intel_details intel
+				LEFT JOIN hack_credentials cred ON cred.id = intel.target
+				WHERE intel.character_id = ? AND intel.type_name = 'credential'`
 
 	rows, err := db.Query(query, characterId)
 
@@ -85,11 +52,21 @@ func GetHackCharacterCredentials(db *sql.DB, characterId int64) ([]HackCredentia
 }
 
 func GetHackCharacterServers(db *sql.DB, characterId int64) ([]HackServer, error) {
-	query :=
-		`SELECT server.id, server.name, server.ipv4, server.address 
-			FROM hack_servers server 
-			LEFT JOIN hav.hack_r_character_servers char_servers on server.id = char_servers.server_id 
-			WHERE char_servers.character_id = ?`
+	/*query :=
+	`SELECT server.id, server.name, server.ipv4, server.address,
+			server.character_id, server.tags, server.ip_effective_date
+		FROM hack_server_details server
+		LEFT JOIN hav.hack_r_character_servers char_servers on server.id = char_servers.server_id
+		WHERE char_servers.character_id = ?`*/
+
+	query := `SELECT server.id as id, server.name as name, ip.ipv4 as ipv4, server.address as address,
+       			server.character_id as character_id, server.tags as tags,
+       			ip.effective_date as ip_effective_date
+				FROM hack_character_intel_details intel
+				LEFT JOIN hack_ip_details ip ON intel.target = ip.ipv4
+				LEFT JOIN hack_server_details server ON ip.server_id = server.id
+				WHERE intel.character_id = ? AND intel.type_name = 'ip_address' AND ip.status = 'online'
+				ORDER BY ip.status DESC, server.name asc`
 
 	rows, err := db.Query(query, characterId)
 
@@ -100,18 +77,10 @@ func GetHackCharacterServers(db *sql.DB, characterId int64) ([]HackServer, error
 
 	var servers []HackServer
 	for rows.Next() {
-		// Prep potentially null objects.
-		// None, continue.
-
-		// Scan the row into the HackServer.
-		var server HackServer
-		err = rows.Scan(&server.ID, &server.Name, &server.IPv4, &server.Address)
+		var server, err = scanCurrentServerRow(rows)
 		if err != nil {
 			return nil, err
 		}
-
-		// Process nullables.
-		// None to process.
 
 		servers = append(servers, server)
 	}
@@ -121,7 +90,7 @@ func GetHackCharacterServers(db *sql.DB, characterId int64) ([]HackServer, error
 }
 
 func GetHackServers(db *sql.DB, where string) ([]HackServer, error) {
-	query := "SELECT id, name, ipv4, address FROM hack_servers"
+	query := "SELECT id, name, ipv4, address, character_id, tags, ip_effective_date FROM hack_server_details"
 	if where != "" {
 		query += " WHERE " + where
 	}
@@ -135,18 +104,10 @@ func GetHackServers(db *sql.DB, where string) ([]HackServer, error) {
 
 	var servers []HackServer
 	for rows.Next() {
-		// Prep potentially null objects.
-		// None, continue.
-
-		// Scan the row into the HackServer.
-		var server HackServer
-		err = rows.Scan(&server.ID, &server.Name, &server.IPv4, &server.Address)
+		var server, err = scanCurrentServerRow(rows)
 		if err != nil {
 			return nil, err
 		}
-
-		// Process nullables.
-		// None to process.
 
 		servers = append(servers, server)
 	}
@@ -159,7 +120,7 @@ func GetHackServerFile(db *sql.DB, fileId int64) (HackServerFile, error) {
 	var file HackServerFile
 
 	query :=
-		`SELECT id, server_id, filename, extension, data FROM hack_server_files
+		`SELECT id, server_id, filename, extension, data, intel_id FROM hack_server_files
 			WHERE id = ?`
 
 	rows, err := db.Query(query, fileId)
@@ -171,13 +132,18 @@ func GetHackServerFile(db *sql.DB, fileId int64) (HackServerFile, error) {
 
 	for rows.Next() {
 		// Prep potentially null objects.
-		// None, continue.
+		var intelId sql.NullInt64
 
 		// Scan the row into the HackServer.
 
-		err = rows.Scan(&file.ID, &file.ServerID, &file.Filename, &file.Extension, &file.Data)
+		err = rows.Scan(&file.ID, &file.ServerID, &file.Filename, &file.Extension, &file.Data, &intelId)
 		if err != nil {
 			return file, err
+		}
+
+		// Process nullables.
+		if intelId.Valid {
+			file.IntelID = intelId.Int64
 		}
 
 		// Done. Return.
@@ -280,34 +246,21 @@ func GetChapters(db *sql.DB) ([]Chapter, error) {
 
 // HACKING ////
 
-func CreateHackUpload(db *sql.DB, serverId int64, file HackCharacterFile) (int64, error) {
-	// Create the query.
-	query := `INSERT INTO hack_server_files (server_id, filename, extension, data) VALUES (?, ?, ?, ?)`
+func HackTransferFile(db *sql.DB, targetServerId int64, file HackServerFile) (int64, error) {
+	// Create variables.
+	var result sql.Result
+	var err error
 
-	// Run the query.
-	result, err := db.Exec(query, serverId, file.Filename, file.Extension, file.Data)
+	// Create and run the query.
+	if file.IntelID == 0 {
+		query := `INSERT INTO hack_server_files (server_id, filename, extension, data) VALUES (?, ?, ?, ?)`
 
-	if err != nil {
-		return 0, err
+		result, err = db.Exec(query, targetServerId, file.Filename, file.Extension, file.Data)
+	} else {
+		query := `INSERT INTO hack_server_files (server_id, filename, extension, data, intel_id) VALUES (?, ?, ?, ?, ?)`
+
+		result, err = db.Exec(query, targetServerId, file.Filename, file.Extension, file.Data, file.IntelID)
 	}
-
-	fileID, err := result.LastInsertId()
-
-	if err != nil {
-		return 0, err
-	}
-
-	// Done!
-	return fileID, nil
-}
-
-func CreateHackDownload(db *sql.DB, characterId int64, file HackServerFile) (int64, error) {
-	// Create the query.
-	query := `INSERT INTO hack_character_files (character_id, filename, extension, data) VALUES (?, ?, ?, ?)`
-
-	// Run the query.
-	result, err := db.Exec(query, characterId, file.Filename, file.Extension, file.Data)
-
 	if err != nil {
 		return 0, err
 	}
@@ -327,8 +280,9 @@ func CreateHackDownload(db *sql.DB, characterId int64, file HackServerFile) (int
 func HackConnectToServer(db *sql.DB, credential HackCredential) (HackServer, error) {
 	var server HackServer
 
-	query := `SELECT server.id, server.name, server.ipv4, server.address
-				FROM hack_servers server
+	query := `SELECT server.id, server.name, server.ipv4, server.address,
+				server.character_id, server.tags, server.ip_effective_date
+				FROM hack_server_details server
 				LEFT JOIN hav.hack_credentials creds on server.id = creds.server_id
 				WHERE creds.username = ? AND creds.password = ? AND server.id = ?`
 
@@ -340,12 +294,7 @@ func HackConnectToServer(db *sql.DB, credential HackCredential) (HackServer, err
 	defer rows.Close()
 
 	for rows.Next() {
-		// Prep potentially null objects.
-		// None, continue.
-
-		// Scan the row into the HackServer.
-
-		err = rows.Scan(&server.ID, &server.Name, &server.IPv4, &server.Address)
+		var server, err = scanCurrentServerRow(rows)
 		if err != nil {
 			return server, err
 		}
@@ -392,3 +341,37 @@ func UpdateEvent(db *sql.DB, params map[string]string) {
 }
 
 // DELETE
+
+////
+// SCANNING
+
+func scanCurrentServerRow(rows *sql.Rows) (HackServer, error) {
+	// Prep potentially null objects.
+	var Address sql.NullString
+	var CharacterID sql.NullInt64
+	var Tags sql.NullString
+
+	// Scan the row into the HackServer.
+	var server HackServer
+	var err error
+	err = rows.Scan(
+		&server.ID, &server.Name, &server.IPv4, &Address,
+		&CharacterID, &Tags, &server.IPEffectiveDate,
+	)
+	if err != nil {
+		return server, err
+	}
+
+	// Process nullables.
+	if Address.Valid {
+		server.Address = Address.String
+	}
+	if CharacterID.Valid {
+		server.CharacterID = CharacterID.Int64
+	}
+	if Tags.Valid {
+		server.Tags = Tags.String
+	}
+
+	return server, nil
+}
