@@ -4,16 +4,30 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"io"
 	"practice-go/database"
 	"practice-go/model"
 	"strconv"
+	"time"
 )
 
 func GenerateRoutes(db *sql.DB) *gin.Engine {
 	// Create the engine object.
 	routes := gin.Default()
+
+	routes.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"PUT", "PATCH"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		AllowOriginFunc: func(origin string) bool {
+			return origin == "http://localhost:3000"
+		},
+		MaxAge: 12 * time.Hour,
+	}))
 
 	// Create all routes.
 
@@ -21,8 +35,115 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 	//// ROUTES - GET //////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
 
+	// NON-HACKING ////////////////////////////////
+
+	routes.GET("/character/:id", func(context *gin.Context) {
+		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Invalid character ID format.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		character, err := database.GetCharacter(db, charID)
+
+		if err != nil {
+			var code int = 500
+			//var message string
+
+			switch err {
+			case sql.ErrNoRows:
+				code = 404
+			}
+
+			context.JSON(code, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Character found.",
+			"data": gin.H{
+				"character": character,
+			},
+			//"character": character,
+		})
+		return
+	})
+
+	routes.GET("/site/:id", func(context *gin.Context) {
+		siteID, err := strconv.ParseInt(context.Param("id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Invalid ID format.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		site, err := database.GetSite(db, siteID)
+
+		if err != nil {
+			var code int = 500
+
+			switch err {
+			case sql.ErrNoRows:
+				code = 404
+			}
+
+			context.JSON(code, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Site found.",
+			"data": gin.H{
+				"site": site,
+			},
+		})
+		return
+	})
+
 	// HACKING ////////////////////////////////
 
+	routes.GET("/hack/character/:id/intel", func(context *gin.Context) {
+		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Invalid character ID format.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		intel, servers, credentials, ips, _, _, _, _, _, _, err := database.GetHackCharacterIntel(db, charID)
+
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Intel found.",
+			"data": gin.H{
+				"intel":       intel,
+				"servers":     servers,
+				"credentials": credentials,
+				"ips":         ips,
+			},
+		})
+		return
+	})
 	routes.GET("/hack/character/:id/credentials", func(context *gin.Context) {
 		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
 		if err != nil {
@@ -49,7 +170,6 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		})
 		return
 	})
-
 	routes.GET("/hack/character/:id/servers", func(context *gin.Context) {
 		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
 		if err != nil {
@@ -76,7 +196,6 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		})
 		return
 	})
-
 	routes.GET("/hack/servers", func(context *gin.Context) {
 		data, err := database.GetHackServers(db, "")
 
@@ -117,6 +236,25 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		})
 		return
 		//context.JSON(200, gin.H{"message": "List of events"})
+	})
+	routes.GET("/site", func(context *gin.Context) {
+		sites, err := database.GetSites(db, "")
+
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error retrieving sites.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Sites found.",
+			"data": gin.H{
+				"sites": sites,
+			},
+		})
+		return
 	})
 	routes.GET("/events/:id", func(context *gin.Context) {
 		eventID := context.Param("id")
@@ -163,6 +301,21 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	// ROUTES - POST
 
+	//// AUTH ////
+
+	routes.POST("/login", func(context *gin.Context) {
+		// TODO: Returning true always, for now.
+		context.JSON(200, gin.H{
+			"message": "Login successful.",
+			"id":      1,
+			"name":    "Raze",
+			"token":   "fake_token",
+		})
+
+		// Gather variables.
+
+	})
+
 	//// HACKING ////////////////////////////////////
 
 	routes.POST("/hack/command/connect", func(context *gin.Context) {
@@ -187,7 +340,57 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		return
 
 	})
+	routes.POST("/hack/server/:server_id/file/list", func(context *gin.Context) {
+		// Gather variables.
+		var jsonFields map[string]interface{}
+		serverID, err := strconv.ParseInt(context.Param("server_id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{"error": "Invalid server_id."})
+		}
 
+		// Read the JSON body.
+		body, err := io.ReadAll(context.Request.Body)
+		if err != nil {
+			context.JSON(400, gin.H{"error": "Failed to read JSON body"})
+			return
+		}
+
+		// Decode JSON into map
+		if err := json.Unmarshal(body, &jsonFields); err != nil {
+			context.JSON(400, gin.H{"error": "Invalid JSON"})
+			return
+		}
+
+		// Variables retrieved.
+		credentialId := int64(jsonFields["credential_id"].(float64))
+		ipv4 := jsonFields["ipv4"].(string)
+
+		// Get the files.
+		data, err := database.GetHackFilesByCredential(db, serverID, credentialId, ipv4)
+
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Error: Files not found.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		if len(data) == 0 {
+			context.JSON(404, gin.H{
+				"message": "No files found.",
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Files found.",
+			"data": gin.H{
+				"files": data,
+			},
+		})
+		return
+	})
 	routes.POST("/hack/command/transfer", func(context *gin.Context) {
 		// Gather variables.
 		var jsonFields map[string]interface{}

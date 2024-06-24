@@ -5,4 +5,5 @@ type HackCredential struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	ServerID int64  `json:"server_id"`
+	IsActive bool   `json:"is_active"`
 }
