@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"io"
+	"log"
 	"practice-go/src/database"
 	"practice-go/src/model"
 	"strconv"
@@ -24,7 +25,18 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
-			return origin == "http://localhost:3000"
+			// TODO: Dynamic cors assignment.
+			log.Println("origin:", origin)
+			switch origin {
+			case "http://localhost:3000":
+			case "99.10.230.220":
+				//case "66.249.83.100":
+				return true
+			default:
+				log.Println("origin rejected")
+				return false
+			}
+			//return origin == "http://localhost:3000"
 		},
 		MaxAge: 12 * time.Hour,
 	}))
