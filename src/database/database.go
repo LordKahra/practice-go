@@ -218,9 +218,9 @@ func GetHackCharacterServers(db *sql.DB, characterId int64) ([]HackServer, error
        			server.character_id as character_id, server.tags as tags,
        			ip.effective_date as ip_effective_date
 				FROM hack_character_intel_details intel
-				LEFT JOIN hack_ip_details ip ON intel.target = ip.ipv4
-				LEFT JOIN hack_server_details server ON ip.server_id = server.id
-				WHERE intel.character_id = ? AND intel.type_name = 'ip_address' AND ip.status = 'online'
+					LEFT JOIN hack_server_details server ON intel.target = server.id
+				    LEFT JOIN hack_ip_details ip ON server.ipv4 = ip.ipv4
+				WHERE intel.character_id = ? AND intel.type_name = 'server'
 				ORDER BY ip.status DESC, server.name asc`
 
 	rows, err := db.Query(query, characterId)
