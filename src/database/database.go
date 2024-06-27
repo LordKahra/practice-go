@@ -2,7 +2,7 @@ package database
 
 import (
 	"errors"
-	. "practice-go/model"
+	. "practice-go/src/model"
 )
 
 import (

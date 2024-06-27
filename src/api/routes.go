@@ -7,8 +7,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"io"
-	"practice-go/database"
-	"practice-go/model"
+	"practice-go/src/database"
+	"practice-go/src/model"
 	"strconv"
 	"time"
 )

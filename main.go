@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"practice-go/api"
-	"practice-go/database"
-	"practice-go/model"
+	"practice-go/src/api"
+	"practice-go/src/database"
+	"practice-go/src/model"
 )
 
 func main() {

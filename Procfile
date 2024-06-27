@@ -1,1 +1,1 @@
-web: src
+web: practice-go
