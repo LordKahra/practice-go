@@ -29,7 +29,9 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 			log.Println("origin:", origin)
 			switch origin {
 			case "http://localhost:3000":
-			case "99.10.230.220":
+			case "http://localhost:8081":
+			case "http://192.168.1.232:8081":
+				//case "99.10.230.220":
 				//case "66.249.83.100":
 				return true
 			}
