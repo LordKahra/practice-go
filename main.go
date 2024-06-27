@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"practice-go/src/api"
 	"practice-go/src/database"
 	"practice-go/src/model"
@@ -17,7 +18,8 @@ func main() {
 
 	var routes = api.GenerateRoutes(db)
 
-	routes.Run(":8080")
+	port := os.Getenv("PORT")
+	routes.Run(":" + port)
 }
 
 func defunct() {
