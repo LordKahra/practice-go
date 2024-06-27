@@ -32,10 +32,9 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 			case "99.10.230.220":
 				//case "66.249.83.100":
 				return true
-			default:
-				log.Println("origin rejected")
-				return false
 			}
+			log.Println("origin rejected")
+			return false
 			//return origin == "http://localhost:3000"
 		},
 		MaxAge: 12 * time.Hour,
