@@ -24,6 +24,51 @@ const (
 
 //// HACKING ///////////////////
 
+func GetHackCharacterComputer(db *sql.DB, characterId int64) (HackServer, []HackServerFile, error) {
+	var server HackServer
+	var files []HackServerFile
+
+	query := `SELECT id, name, ipv4, address, character_id, tags, ip_effective_date
+				FROM hack_server_details WHERE character_id = ?`
+
+	row := db.QueryRow(query, characterId)
+
+	// Prep potentially null objects.
+	var Address sql.NullString
+	var CharacterID sql.NullInt64
+	var Tags sql.NullString
+
+	// Scan the row into the HackServer.
+	var err error
+	err = row.Scan(
+		&server.ID, &server.Name, &server.IPv4, &Address,
+		&CharacterID, &Tags, &server.IPEffectiveDate,
+	)
+	if err != nil {
+		return server, files, err
+	}
+
+	// Process nullables.
+	if Address.Valid {
+		server.Address = Address.String
+	}
+	if CharacterID.Valid {
+		server.CharacterID = CharacterID.Int64
+	}
+	if Tags.Valid {
+		server.Tags = Tags.String
+	}
+
+	// Server retrieved. Get the files.
+	files, err = getHackFilesByServer(db, server.ID)
+
+	if err != nil {
+		return server, files, err
+	}
+
+	return server, files, nil
+}
+
 func GetHackCharacterIntel(db *sql.DB, characterId int64) ([]HackIntel, []HackServer, []HackCredential, []HackIP, []int64, []int64, []int64, []int64, []int64, []string, error) {
 	query := `SELECT intel.id as id, intel.name as name, intel.type_id as type_id, intel.type_name as type_name, intel.target as target, intel.is_visible as is_visible
 				FROM hack_character_intel_details intel
@@ -480,6 +525,34 @@ func GetHackFilesByCredential(db *sql.DB, serverId int64, credentialId int64, ip
 				ORDER BY file.filename`
 
 	rows, err := db.Query(query, credentialId, ipv4, serverId)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hackServerFiles []HackServerFile
+	for rows.Next() {
+		var file, err = scanCurrentFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		hackServerFiles = append(hackServerFiles, file)
+	}
+
+	// Done.
+	return hackServerFiles, rows.Err()
+}
+
+func getHackFilesByServer(db *sql.DB, serverId int64) ([]HackServerFile, error) {
+	query := `SELECT 
+					file.id as id, file.server_id as server_id, file.filename as filename, 
+					file.extension as extension, file.data as data, file.intel_id as intel_id
+				FROM hack_server_files file
+				WHERE file.server_id = ?
+				ORDER BY file.filename`
+
+	rows, err := db.Query(query, serverId)
 
 	if err != nil {
 		return nil, err

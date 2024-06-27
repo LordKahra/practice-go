@@ -113,6 +113,43 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	// HACKING ////////////////////////////////
 
+	routes.GET("/hack/character/:id/computer", func(context *gin.Context) {
+		serverID, err := strconv.ParseInt(context.Param("id"), 10, 64)
+		if err != nil {
+			context.JSON(500, gin.H{
+				"message": "Invalid server ID format.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		server, files, err := database.GetHackCharacterComputer(db, serverID)
+
+		if err != nil {
+			var code int = 500
+
+			switch err {
+			case sql.ErrNoRows:
+				code = 404
+			}
+
+			context.JSON(code, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"message": "Character computer found.",
+			"data": gin.H{
+				"server": server,
+				"files":  files,
+			},
+		})
+		return
+	})
+
 	routes.GET("/hack/character/:id/intel", func(context *gin.Context) {
 		charID, err := strconv.ParseInt(context.Param("id"), 10, 64)
 		if err != nil {
