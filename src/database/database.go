@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"log"
 	. "practice-go/src/model"
 )
 
@@ -125,18 +126,21 @@ func GetHackCharacterIntel(db *sql.DB, characterId int64) ([]HackIntel, []HackSe
 	// Retrieval information gathered. Fetch individual values.
 	if hasServers {
 		servers, err = GetHackCharacterServers(db, characterId)
+		log.Println("Servers fetched: ", servers)
 		if err != nil {
 			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 		}
 	}
 	if hasCredentials {
 		credentials, err = GetHackCharacterCredentials(db, characterId)
+		log.Println("credentials fetched: ", credentials)
 		if err != nil {
 			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 		}
 	}
 	if hasIPs {
 		ips, err = GetHackCharacterIPv4s(db, characterId)
+		log.Println("ips fetched: ", ips)
 		if err != nil {
 			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 		}
