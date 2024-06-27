@@ -489,16 +489,19 @@ func HackTransferFile(db *sql.DB, targetServerId int64, file HackServerFile) (in
 
 // HACKING - LOGGING IN
 
-func HackConnectToServer(db *sql.DB, credential HackCredential) (HackServer, error) {
+func HackConnectToServer(db *sql.DB, ipv4 string, username string, password string) (HackServer, error) {
 	var server HackServer
 
 	query := `SELECT server.id, server.name, server.ipv4, server.address,
 				server.character_id, server.tags, server.ip_effective_date
 				FROM hack_server_details server
 				LEFT JOIN hav.hack_credentials creds on server.id = creds.server_id
-				WHERE creds.username = ? AND creds.password = ? AND server.id = ?`
+				WHERE
+				    creds.username = ? AND creds.password = ?
+                    AND creds.is_active = true
+				    AND server.ipv4 = ?`
 
-	rows, err := db.Query(query, credential.Username, credential.Password, credential.ServerID)
+	rows, err := db.Query(query, username, password, ipv4)
 
 	if err != nil {
 		return server, err

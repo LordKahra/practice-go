@@ -368,15 +368,32 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 
 	//// HACKING ////////////////////////////////////
 
-	routes.POST("/hack/command/connect", func(context *gin.Context) {
+	routes.POST("/hack/command/:ipv4/connect", func(context *gin.Context) {
 		// Gather variables.
-		var credential model.HackCredential
-		if err := context.ShouldBindJSON(&credential); err != nil {
-			context.JSON(400, gin.H{"error": "Invalid JSON format"})
+		var jsonFields map[string]interface{}
+
+		// Load the IP.
+		ipv4 := context.Param("ipv4")
+
+		// Read the JSON body.
+		body, err := io.ReadAll(context.Request.Body)
+		if err != nil {
+			context.JSON(400, gin.H{"error": "Failed to read JSON body"})
 			return
 		}
 
-		server, err := database.HackConnectToServer(db, credential)
+		// Decode JSON into map
+		if err := json.Unmarshal(body, &jsonFields); err != nil {
+			context.JSON(400, gin.H{"error": "Invalid JSON"})
+			return
+		}
+
+		// Variables retrieved.
+		username := jsonFields["username"].(string)
+		password := jsonFields["password"].(string)
+
+		server, err := database.HackConnectToServer(db, ipv4, username, password)
+		// TODO: Better errors.
 		if err != nil {
 			context.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -385,7 +402,9 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		// server found.
 		context.JSON(200, gin.H{
 			"message": "Server connection successful.",
-			"data":    server,
+			"data": gin.H{
+				"server": server,
+			},
 		})
 		return
 
