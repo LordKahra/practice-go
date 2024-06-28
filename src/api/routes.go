@@ -19,7 +19,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 	routes := gin.Default()
 
 	routes.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"PUT", "PATCH"},
 		AllowHeaders:     []string{"Origin"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -31,8 +31,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 			case "http://localhost:3000":
 			case "http://localhost:8081":
 			case "http://192.168.1.232:8081":
-				//case "99.10.230.220":
-				//case "66.249.83.100":
+			case "*":
 				return true
 			}
 			log.Println("origin rejected")
