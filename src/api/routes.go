@@ -409,13 +409,13 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		return
 
 	})
-	routes.POST("/hack/server/:server_id/file/list", func(context *gin.Context) {
+
+	routes.POST("/hack/command/:ipv4/file/list", func(context *gin.Context) {
 		// Gather variables.
 		var jsonFields map[string]interface{}
-		serverID, err := strconv.ParseInt(context.Param("server_id"), 10, 64)
-		if err != nil {
-			context.JSON(500, gin.H{"error": "Invalid server_id."})
-		}
+
+		// Load the IP.
+		ipv4 := context.Param("ipv4")
 
 		// Read the JSON body.
 		body, err := io.ReadAll(context.Request.Body)
@@ -431,11 +431,11 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		}
 
 		// Variables retrieved.
-		credentialId := int64(jsonFields["credential_id"].(float64))
-		ipv4 := jsonFields["ipv4"].(string)
+		username := jsonFields["username"].(string)
+		password := jsonFields["password"].(string)
 
 		// Get the files.
-		data, err := database.GetHackFilesByCredential(db, serverID, credentialId, ipv4)
+		data, err := database.GetHackFilesByCredential(db, ipv4, username, password)
 
 		if err != nil {
 			context.JSON(500, gin.H{

@@ -524,17 +524,20 @@ func HackConnectToServer(db *sql.DB, ipv4 string, username string, password stri
 	return server, errors.New("server not found")
 }
 
-func GetHackFilesByCredential(db *sql.DB, serverId int64, credentialId int64, ipv4 string) ([]HackServerFile, error) {
+func GetHackFilesByCredential(db *sql.DB, ipv4 string, username string, password string) ([]HackServerFile, error) {
 	query := `SELECT 
 					file.id as id, file.server_id as server_id, file.filename as filename, 
 					file.extension as extension, file.data as data, file.intel_id as intel_id
 				FROM hack_server_files file
 				INNER JOIN hack_credentials creds on file.server_id = creds.server_id
 				INNER JOIN hack_server_details server on server.id = file.server_id
-				WHERE creds.id = ? AND server.ipv4 = ? AND server.id = ?
+				WHERE 
+				    creds.username = ? AND creds.password = ? 
+				  	AND creds.is_active = true
+				  	AND server.ipv4 = ?
 				ORDER BY file.filename`
 
-	rows, err := db.Query(query, credentialId, ipv4, serverId)
+	rows, err := db.Query(query, username, password, ipv4)
 
 	if err != nil {
 		return nil, err
