@@ -14,6 +14,25 @@ import (
 	"time"
 )
 
+func getJSONBody(context *gin.Context) (map[string]interface{}, error) {
+	// Gather variables.
+	var jsonFields map[string]interface{}
+
+	// Read the JSON body
+	body, err := io.ReadAll(context.Request.Body)
+	if err != nil {
+		//context.JSON(400, gin.H{"error": "Failed to read JSON body"})
+		return jsonFields, err
+	}
+
+	// Decode JSON into map
+	if err := json.Unmarshal(body, &jsonFields); err != nil {
+		//context.JSON(400, gin.H{"error": "Invalid JSON"})
+		return jsonFields, err
+	}
+	return jsonFields, nil
+}
+
 func GenerateRoutes(db *sql.DB) *gin.Engine {
 	// Create the engine object.
 	routes := gin.Default()
@@ -83,7 +102,6 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 			"data": gin.H{
 				"character": character,
 			},
-			//"character": character,
 		})
 		return
 	})
@@ -460,48 +478,48 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		})
 		return
 	})
-	routes.POST("/hack/command/transfer", func(context *gin.Context) {
-		// Gather variables.
-		var jsonFields map[string]interface{}
 
-		// Read the JSON body
-		body, err := io.ReadAll(context.Request.Body)
+	routes.POST("/hack/command/:ipv4/file/download", func(context *gin.Context) {
+		// Gather variables.
+		jsonFields, err := getJSONBody(context)
 		if err != nil {
 			context.JSON(400, gin.H{"error": "Failed to read JSON body"})
 			return
 		}
 
-		// Decode JSON into map
-		if err := json.Unmarshal(body, &jsonFields); err != nil {
-			context.JSON(400, gin.H{"error": "Invalid JSON"})
-			return
-		}
+		// Load the IP.
+		ipv4 := context.Param("ipv4")
 
 		// Variables retrieved.
-
+		username := jsonFields["username"].(string)
+		password := jsonFields["password"].(string)
 		fileId := int64(jsonFields["file_id"].(float64))
-		serverId := int64(jsonFields["server_id"].(float64))
+		characterId := int64(jsonFields["character_id"].(float64))
 
-		// Get the file.
-		file, err := database.GetHackServerFile(db, fileId)
-
-		if err != nil {
-			context.JSON(500, gin.H{"error": "File not found."})
-			return
-		}
-
-		// Attempt the upload.
-		result, err := database.HackTransferFile(db, serverId, file)
+		// Download the file.
+		fileId, err = database.HackDownloadFile(
+			db, ipv4, username, password, fileId, characterId)
 
 		if err != nil {
-			context.JSON(500, gin.H{"error": err.Error()})
+			var code int = 500
+			//var message string
+
+			switch err {
+			case sql.ErrNoRows:
+				code = 404
+			}
+
+			context.JSON(code, gin.H{
+				"message": "Error.",
+				"error":   err.Error(),
+			})
 			return
 		}
 
 		// Transfer successful.
 		context.JSON(201, gin.H{
 			"message": "File transfer successful.",
-			"data":    result,
+			"data":    gin.H{"file_id": fileId},
 		})
 		return
 	})

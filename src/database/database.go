@@ -458,8 +458,54 @@ func GetChapters(db *sql.DB) ([]Chapter, error) {
 
 // HACKING ////
 
-func HackTransferFile(db *sql.DB, targetServerId int64, file HackServerFile) (int64, error) {
+func HackDownloadFile(db *sql.DB, ipv4 string, username string, password string, fileId int64, characterId int64) (int64, error) {
 	// Create variables.
+	var err error
+	var file HackServerFile
+	server, _, err := GetHackCharacterComputer(db, characterId)
+
+	// Ensure the server exists.
+	if err != nil {
+		return 0, err
+	}
+
+	// Get the file.
+	query := `SELECT 
+					file.id as id, file.server_id as server_id, file.filename as filename, 
+					file.extension as extension, file.data as data, file.intel_id as intel_id
+				FROM hack_server_files file
+				INNER JOIN hack_credentials creds on file.server_id = creds.server_id
+				INNER JOIN hack_server_details server on server.id = file.server_id
+				WHERE 
+				    creds.username = ? AND creds.password = ? 
+				  	AND creds.is_active = true
+				  	AND server.ipv4 = ?
+				  	AND file.id = ?`
+
+	row := db.QueryRow(query, username, password, ipv4, fileId)
+
+	// Prep potentially null objects.
+	var IntelID sql.NullInt64
+
+	// Scan the row into the file.
+	err = row.Scan(&file.ID, &file.ServerID, &file.Filename, &file.Extension, &file.Data, &IntelID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Process nullables.
+	if IntelID.Valid {
+		file.IntelID = IntelID.Int64
+	}
+
+	// File retrieved. Insert it into the database.
+	return insertFile(db, server.ID, file)
+}
+
+func HackTransferFile(db *sql.DB, targetServerId int64, file HackServerFile) (int64, error) {
+	return insertFile(db, targetServerId, file)
+
+	/*// Create variables.
 	var result sql.Result
 	var err error
 
@@ -484,7 +530,7 @@ func HackTransferFile(db *sql.DB, targetServerId int64, file HackServerFile) (in
 	}
 
 	// Done!
-	return fileID, nil
+	return fileID, nil*/
 }
 
 // HACKING - LOGGING IN
@@ -703,4 +749,33 @@ func scanCurrentSiteRow(rows *sql.Rows) (Site, error) {
 
 	// Done. No nullables to process.
 	return site, nil
+}
+
+// PRIVATE CALLS ////
+
+func insertFile(db *sql.DB, serverID int64, file HackServerFile) (int64, error) {
+	// Create variables.
+	var result sql.Result
+	var err error
+
+	if file.IntelID == 0 {
+		query := `INSERT INTO hack_server_files (server_id, filename, extension, data) VALUES (?, ?, ?, ?)`
+		result, err = db.Exec(query, serverID, file.Filename, file.Extension, file.Data)
+	} else {
+		query := `INSERT INTO hack_server_files (server_id, filename, extension, data, intel_id) VALUES (?, ?, ?, ?, ?)`
+		result, err = db.Exec(query, serverID, file.Filename, file.Extension, file.Data, file.IntelID)
+	}
+
+	if err != nil {
+		return 0, err
+	}
+
+	fileID, err := result.LastInsertId()
+
+	if err != nil {
+		return 0, err
+	}
+
+	// Done!
+	return fileID, nil
 }
