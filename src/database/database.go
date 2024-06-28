@@ -502,6 +502,7 @@ func HackConnectToServer(db *sql.DB, ipv4 string, username string, password stri
 				    AND server.ipv4 = ?`
 
 	log.Println("DEBUG: query: ", query)
+	log.Println("ipv4: ", ipv4, " u: ", username, " p: ", password)
 
 	rows, err := db.Query(query, username, password, ipv4)
 
