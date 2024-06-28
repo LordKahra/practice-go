@@ -495,7 +495,7 @@ func HackConnectToServer(db *sql.DB, ipv4 string, username string, password stri
 	query := `SELECT server.id, server.name, server.ipv4, server.address,
 				server.character_id, server.tags, server.ip_effective_date
 				FROM hack_server_details server
-				LEFT JOIN hav.hack_credentials creds on server.id = creds.server_id
+				LEFT JOIN hack_credentials creds on server.id = creds.server_id
 				WHERE
 				    creds.username = ? AND creds.password = ?
                     AND creds.is_active = true
