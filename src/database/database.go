@@ -458,7 +458,7 @@ func GetChapters(db *sql.DB) ([]Chapter, error) {
 
 // HACKING ////
 
-func HackDownloadFile(db *sql.DB, ipv4 string, username string, password string, fileId int64, characterId int64) (int64, error) {
+func HackDownloadFile(db *sql.DB, ipv4 string, username string, password string, fileId int64, characterId int64) (HackServerFile, error) {
 	// Create variables.
 	var err error
 	var file HackServerFile
@@ -466,7 +466,7 @@ func HackDownloadFile(db *sql.DB, ipv4 string, username string, password string,
 
 	// Ensure the server exists.
 	if err != nil {
-		return 0, err
+		return file, err
 	}
 
 	// Get the file.
@@ -490,7 +490,7 @@ func HackDownloadFile(db *sql.DB, ipv4 string, username string, password string,
 	// Scan the row into the file.
 	err = row.Scan(&file.ID, &file.ServerID, &file.Filename, &file.Extension, &file.Data, &IntelID)
 	if err != nil {
-		return 0, err
+		return file, err
 	}
 
 	// Process nullables.
@@ -499,7 +499,18 @@ func HackDownloadFile(db *sql.DB, ipv4 string, username string, password string,
 	}
 
 	// File retrieved. Insert it into the database.
-	return insertFile(db, server.ID, file)
+	fileId, err = insertFile(db, server.ID, file)
+
+	if err != nil {
+		return file, err
+	}
+
+	// Update the file.
+	file.ID = fileId
+	file.ServerID = server.ID
+
+	// Done.
+	return file, nil
 }
 
 func HackTransferFile(db *sql.DB, targetServerId int64, file HackServerFile) (int64, error) {

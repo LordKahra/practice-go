@@ -51,7 +51,9 @@ BEGIN
 
         IF (chara_id IS NOT NULL) THEN
             # Save the intel.
-            INSERT INTO hack_r_character_intel (character_id, intel_id) VALUES (chara_id, NEW.intel_id);
+            INSERT INTO hack_r_character_intel (character_id, intel_id)
+            VALUES (chara_id, NEW.intel_id)
+            ON DUPLICATE KEY UPDATE character_id = character_id;
         end if;
     end if;
 END;

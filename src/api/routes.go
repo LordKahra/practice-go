@@ -480,6 +480,9 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 	})
 
 	routes.POST("/hack/command/:ipv4/file/download", func(context *gin.Context) {
+		// Declare variables.
+		var file model.HackServerFile
+
 		// Gather variables.
 		jsonFields, err := getJSONBody(context)
 		if err != nil {
@@ -497,7 +500,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		characterId := int64(jsonFields["character_id"].(float64))
 
 		// Download the file.
-		fileId, err = database.HackDownloadFile(
+		file, err = database.HackDownloadFile(
 			db, ipv4, username, password, fileId, characterId)
 
 		if err != nil {
@@ -519,7 +522,7 @@ func GenerateRoutes(db *sql.DB) *gin.Engine {
 		// Transfer successful.
 		context.JSON(201, gin.H{
 			"message": "File transfer successful.",
-			"data":    gin.H{"file_id": fileId},
+			"data":    gin.H{"file": file},
 		})
 		return
 	})
